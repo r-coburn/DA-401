@@ -1,0 +1,228 @@
+---
+title: "EDA"
+author: "Riley Coburn"
+date: "2023-02-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#always run
+
+library(spotifyr)
+library(lubridate)
+library(tidyverse)
+library(knitr)
+
+Sys.setenv(SPOTIFY_CLIENT_ID = '4368c76bfce14f35b6ea1b3ea6b3723b')
+Sys.setenv(SPOTIFY_CLIENT_SECRET = '533222a8cd3b4d8398d83e9c87ec084f')
+access_token <- get_spotify_access_token()
+
+data <- read.csv("Big_data")
+data <- data[,c(1:2,6,3:5)]
+
+for(i in 1:nrow(data)) { #for release dates with only the year, it sets it to be the first day of the year
+    if(nchar(data$release_date[i]) == 4) {
+        data$release_date[i] <- paste(data$release_date[i], "-01-01", sep = "")
+    }
+    if(nchar(data$release_date[i]) == 7) {
+        data$release_date[i] <- paste(data$release_date[i], "-01", sep = "")
+    }
+}
+data$year <- as.numeric(substr(data$release_date, 1, 4))
+```
+
+```{r}
+
+get_my_recently_played(limit = 5) %>% 
+    mutate(artist.name = map_chr(track.artists, function(x) x$name[1])) %>% 
+    select(track.name, artist.name, track.album.name) %>% 
+    kable()
+
+get_my_recently_played()
+get_my_top_artists_or_tracks()
+
+get_my_recently_played(limit = 1) 
+
+get_my_top_artists_or_tracks(type = 'tracks', time_range = 'short_term', limit = 5)$album.artists
+
+
+get_track_audio_analysis("6ZFbXIJkuI1dVNWvzJzown")
+
+get_my_playlists(limit=2)
+
+my_id <- "6ZFbXIJkuI1dVNWvzJzown"
+my_plists <- get_user_playlists("racnyg")
+
+
+get_my_top_artists_or_tracks(type = 'artists', time_range = 'long_term', limit = 5) %>% 
+    select(name, genres) %>% 
+    rowwise %>% 
+    mutate(genres = paste(genres, collapse = ', ')) %>% 
+    ungroup %>% 
+    kable()
+
+get_my_top_artists_or_tracks(limit = 2)$genres
+
+get_user_audio_features("avaswan26")
+get_track_audio_analysis("6ZFbXIJkuI1dVNWvzJzown")$segments$timbre
+get_artist_audio_features("0YC192cP3KPCRWx8zr8MfZ")
+get_playlist_tracks("4GCbucDGdVq4adpklldSjO")
+
+get_artist("74ASZWbe4lXaubB36ztrGX") # have access to genres, name
+get_album("2qvA7HmSg1iM6XMiFF76dp") # last frame gives all of the songs and their IDs + names (but these will be availale once the audio analysis is completed)
+get_track_audio_analysis("7DU7DNVDZouvJ34tPcPxBj") # only need sections and segements which gives all of the informative audio features
+# question: are genre labels manually assigned 
+get_artist_albums("74ASZWbe4lXaubB36ztrGX") # gives all of the albums of an artist
+
+
+
+
+
+get_genre_artists(genre = "rock", limit = 50)$genres
+```
+
+
+```{r}
+#task: find all of Radiohead's music and put it into one file
+# secondary task: create a function which takes an artist and returns the data frame with all of their songs
+
+get_artist("74ASZWbe4lXaubB36ztrGX") # have access to genres, name
+get_album("2qvA7HmSg1iM6XMiFF76dp") # last frame gives all of the songs and their IDs + names (but these will be availale once the audio analysis is completed)
+get_track_audio_analysis("7DU7DNVDZouvJ34tPcPxBj") # only need sections and segements which gives all of the informative audio features
+# question: are genre labels manually assigned 
+get_artist_albums("74ASZWbe4lXaubB36ztrGX") # gives all of the albums of an artist
+
+# radiohead id: 4Z8W4fKeB5YxbusRsdQVPb
+
+
+albums <- get_artist_albums("4Z8W4fKeB5YxbusRsdQVPb") #getting all albums from the artist
+albums$artist_name <- get_artist("4Z8W4fKeB5YxbusRsdQVPb")$name #adding the artist name to the albums
+albums <- albums %>%
+    select(artist_name, name, release_date, id) %>%
+    rename(album_name = name, album_id = id) 
+
+Kid_A <- cbind(albums[1,], get_album(toString("6ofEQubaL265rIW6WnCU8y"))[[19]][[2]][,c("id", "name")]) %>% # adding the songs from the album to the dataset
+    dplyr::distinct(id, .keep_all = T) %>%
+    rename(song_name = name, song_id = id) 
+    
+sections <- get_track_audio_analysis(Kid_A[1,]$song_id)$sections %>%
+    rename(start_sections = start, duration_sections = duration)
+segments <- get_track_audio_analysis(Kid_A[1,]$song_id)$segments[ , c(-7:-4)] %>%
+    rename(start_segments = start, duration_segments = duration)
+audio_analysis <- merge(data.frame(sections, row.names=NULL), data.frame(segments, row.names=NULL), by = 0, all = TRUE)[-1]
+audio_analysis <- audio_analysis[order(audio_analysis$start_sections),] # getting audio analysis for the the first song in the dataset
+
+Kid_A_complete <- cbind(Kid_A[1,], audio_analysis) %>%
+    dplyr::distinct() #combining everything for the first song
+```
+
+```{r}
+add_artist_to_albums <- function(artist_id) {
+    albums <- get_artist_albums(artist_id) #getting all albums from the artist
+    albums$artist_name <- get_artist(artist_id)$name #adding the artist name to the albums
+    albums <- albums %>%
+        select(artist_name, name, release_date, id) %>%
+        dplyr::rename(album_name = name, album_id = id) 
+    return(albums)
+}
+
+album_and_songs <- function(artist_id) {
+    album_and_song <- cbind(add_artist_to_albums(artist_id)[1,], get_album(toString(add_artist_to_albums(artist_id)$album_id[1]))[[19]][[2]][,c("id", "name")], row.names=NULL)
+    for(i in 2:nrow(add_artist_to_albums(artist_id))) {
+        album_and_song <- rbind(album_and_song, cbind(add_artist_to_albums(artist_id)[i,], get_album(toString(add_artist_to_albums(artist_id)$album_id[i]))[[19]][[2]][,c("id", "name")], row.names=NULL))
+    }
+    album_and_song <- album_and_song %>%
+        dplyr::rename(song_name = name, song_id = id)
+    return(album_and_song)
+}
+
+fully_compiled <- function(artist_id) {
+    albums <- album_and_songs(artist_id)
+    sections <- get_track_audio_analysis(albums$song_id[1])$sections %>%
+        rename(start_sections = start, duration_sections = duration)
+    segments <- get_track_audio_analysis(albums$song_id[1])$segments[ , c(-7:-4)] %>%
+        rename(start_segments = start, duration_segments = duration)
+    audio_analysis <- merge(data.frame(sections, row.names=NULL), data.frame(segments, row.names=NULL), by = 0, all = TRUE)[-1]
+    audio_analysis <- audio_analysis[order(audio_analysis$start_sections),] 
+    complete <- cbind(album_and_songs(artist_id)[1,], audio_analysis)
+    for(i in 2:nrow(album_and_songs(artist_id))) {
+        sections <- get_track_audio_analysis(albums$song_id[i])$sections %>%
+            rename(start_sections = start, duration_sections = duration)
+        segments <- get_track_audio_analysis(albums$song_id[i])$segments[ , c(-7:-4)] %>%
+            rename(start_segments = start, duration_segments = duration)
+        audio_analysis <- merge(data.frame(sections, row.names=NULL), data.frame(segments, row.names=NULL), by = 0, all = TRUE)[-1]
+        audio_analysis <- audio_analysis[order(audio_analysis$start_sections),]
+        complete <- rbind(complete, cbind(albums[i,], audio_analysis))
+    }
+    return(complete)
+}
+
+album_and_songs("4Z8W4fKeB5YxbusRsdQVPb")$song_id[1]
+album_and_songs("699OTQXzgjhIYAHMy9RyPD")
+album_and_songs("0Z5pcmXDCKTrFWLnDChC37")
+beatles <- album_and_songs("3WrFJ7ztbogyGnTHbHJFl2")
+
+fully_compiled("3WrFJ7ztbogyGnTHbHJFl2")
+
+
+```
+
+```{r}
+data_sample <- function(sample_size) {
+    n <- sample(1:nrow(data), sample_size)
+    tempo <- c()
+    loudness <- c()
+    songs <- c()
+    artists <- c()
+    for (i in 1:length(n)) {
+        tempo[i] <- mean(get_track_audio_analysis(data[n[i],]$song_id)$sections$tempo)
+        loudness[i] <- mean(get_track_audio_analysis(data[n[i],]$song_id)$sections$loudness) # instead of a simple mean, take the weighted average over the course of the song since each time segment is different
+        songs[i] <- data[n[i],]$song_name
+        artists[i] <- data[n[i],]$artist_name
+    }
+    sampled_data <- data.frame(artists, songs, tempo, loudness)
+    return(sampled_data)
+}
+
+first_sample <- data_sample(10)
+
+plot(first_sample$tempo, first_sample$loudness)
+first_sample
+
+data[sample(nrow(data), 10), ]
+```
+
+```{r}
+data_and_audio_sample <- function(sample_size) {
+    rows <- sample(nrow(data), 10)
+    tempo <- c()
+    loudness <- c()
+    for (i in 1:sample_size) {
+        sections <- get_track_audio_analysis(data[rows[i],]$song_id)$sections
+        segments <- get_track_audio_analysis(data[rows[i],]$song_id)$segments
+        duration_percent <- (sections$tempo/sum(sections$tempo))
+        tempo[i] <- weighted.mean(sections$tempo, duration_percent)
+        loudness[i] <- weighted.mean(sections$loudness, duration_percent) 
+    }
+    sampled_data <- data.frame(data[sample(nrow(data), 10), ], tempo, loudness)
+    row.names(sampled_data) <- NULL
+    return(sampled_data)
+}
+
+d <- data_and_audio_sample(10)
+d
+set.seed(0)
+combined <- rbind(data_and_audio_sample(10), data_and_audio_sample(10))
+for(i in 3:10) {
+    combined <- rbind(combined, data_and_audio_sample(10))
+}
+length(unique(combined$song_id)) # 100 unique songs
+
+plot(combined$year, combined$loudness) #now need to get things like timbre, key, etc. in here so that i can compare them all
+```
+
+
