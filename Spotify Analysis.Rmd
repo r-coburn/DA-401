@@ -1,0 +1,260 @@
+---
+title: "Untitled"
+author: "Riley Coburn"
+date: "2023-04-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(cutpointr)
+library(car)
+library(glmnet)
+library(class)
+library(caret)
+```
+
+```{r}
+# read data
+setwd("~/Desktop/Denison/DA/DA 401/Project/Data")
+data <- read.csv("sample.csv")
+dim(na.omit(data)) # 800 values, 35 features
+features <- data[,c(5,8:33)]
+rock <- data$rock
+
+set.seed(1)
+n = nrow(data)
+index <- sample(1:n, size = n*0.7)
+training <- data[index,]
+test <- data[-index,]
+
+train.features <- data.frame(training[,c(5,8:33)]) 
+train.rock <- training$rock
+
+# predictor in test set, will be used for prediction
+test.features <-  data.frame(test[,c(5,8:33)])
+test.rock <- as.factor(test$rock)
+```
+
+```{r, warning = F}
+# gut check
+
+set.seed(1)
+balanced.data.random <- rbind(head(data, 400), tail(data, 100))
+table((balanced.data.random$genre))
+random.features <- balanced.data.random[,c(5,8:33)]
+
+random.model.accuracy <- c()
+for(i in 1:50) {
+  data.random <- random.features[sample(nrow(random.features)),]
+  team <- c(rep(0,250),rep(1,250))
+  
+  cv.mod.random <- cv.glmnet(x = as.matrix(data.random), y = team, family = "binomial", type.measure = "class")
+  lambda <- cv.mod.random$lambda.min
+
+  mod <- glmnet(as.matrix(data.random), team, family = "binomial", lambda = lambda)
+  
+  random.probs <- predict(mod, newx = as.matrix(data.random), type = "response")
+  team.class <- ifelse(team == 1, "team 1", "team 2")
+  mod.cp <- cutpointr(data.frame(team.class, random.probs), x=random.probs, class = team.class, method = maximize_metric, metric = accuracy)
+
+  random.model.accuracy[i] <- mod.cp$acc
+}
+
+hist(random.model.accuracy); mean(random.model.accuracy) # accuracy = 58.92%
+```
+
+```{r}
+# first logistic regression model (L2 regularized with all variables)
+
+cv.mod <- cv.glmnet(x = as.matrix(features), y = rock, family = "binomial", type.measure = "class")
+lambda <- cv.mod$lambda.min
+
+mod <- glmnet(features, rock, family = "binomial", lambda = lambda)
+mod.probs <- predict(mod, newx = as.matrix(features), type = "response")
+data$mod.probs <- mod.probs[,1]
+rock.class <- ifelse(data$rock == 1, "rock", "not rock")
+logistic.probs <- data$mod.probs
+mod.cp <- cutpointr(data.frame(rock.class, logistic.probs), x=logistic.probs, class = rock.class, method = maximize_metric, metric = accuracy)
+summary(mod.cp) # accuracy = 67.12%
+
+plot(x = data$year, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by Release Year", xlab = "Year", ylab = "Precicted Probabilty of Rock")
+legend("bottomleft", legend=unique(data$genre),
+       col=factor(unique(data$genre)), pch=1, cex=0.8,
+       title="Genres", text.font=4)
+
+plot(x = data$p8, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by 8th Pitch Class", xlab = "Pitch Class 8", ylab = "Precicted Probabilty of Rock")
+legend("bottomleft", legend=unique(data$genre),
+       col=factor(unique(data$genre)), pch=1, cex=0.8,
+       title="Genres", text.font=4)
+```
+
+```{r}
+# second logistic regression model (L2 reguularized with PCA)
+
+features.norm <- scale(features)
+corr.mat <- cor(features.norm)
+features.pca <- princomp(corr.mat)
+summary(features.pca) # top 20 principal components make up over 99% of variance, top 7 over 80%, and first two almost 50%
+loadings.20 <- features.pca$loadings[,1:20]
+loadings.7 <- features.pca$loadings[,1:7]
+loadings.2 <- features.pca$loadings[,1:2]
+prin.coms <- data.frame(as.matrix(features) %*% as.matrix(features.pca$loadings))
+
+cv.mod.pca <- cv.glmnet(x = as.matrix(prin.coms), y = rock, family = "binomial", type.measure = "class")
+lambda.pca <- cv.mod.pca$lambda.min
+
+mod.pca <- glmnet(prin.coms, rock, family = "binomial", lambda = lambda.pca)
+mod.probs.pca <- predict(mod.pca, newx = as.matrix(prin.coms), type = "response")
+data$mod.probs.pca <- mod.probs.pca[,1]
+rock.class <- ifelse(data$rock == 1, "rock", "not rock")
+logistic.probs.pca <- data$mod.probs.pca
+mod.cp.pca <- cutpointr(data.frame(rock.class, logistic.probs.pca), x=logistic.probs.pca, class = rock.class, method = maximize_metric, metric = accuracy)
+summary(mod.cp.pca) # accuracy = 65%
+
+plot(x = prin.coms$Comp.1, y = prin.coms$Comp.2, col = factor(data$genre), main = "Spotify Music by its first two principal components", xlab = "Pincipal Component 1", ylab = "Principal Componenet 2")
+legend("bottomleft", legend=unique(data$genre),
+       col=factor(unique(data$genre)), pch=1, cex=0.8,
+       title="Genres", text.font=4)
+```
+
+```{r}
+# first KNN
+
+accuracy <- c()
+for(i in 1:100){
+  predicted <- knn(train = train.features, test = test.features, cl = train.rock, k = i)
+  ConMat <- table(test.rock, predicted)
+  TN <- ConMat[1,1]
+  FP <- ConMat[1,2]
+  FN <- ConMat[2,1]
+  TP <- ConMat[2,2]
+  accuracy[i] <- (TP + TN)/sum(ConMat)
+}
+plot(accuracy)
+which.max(accuracy) # optimal K = 6
+max(accuracy) #classification accuracy of 60.0%
+```
+
+```{r}
+# second KNN (with PCA)
+
+train.features.norm <- scale(train.features)
+train.corr.mat <- cor(train.features.norm)
+train.features.pca <- princomp(train.corr.mat)
+summary(train.features.pca) # top 20 principal components make up over 99% of variance and first two almost 50%
+train.prin.coms <- data.frame(as.matrix(train.features) %*% as.matrix(train.features.pca$loadings))
+
+test.features.norm <- scale(test.features)
+test.corr.mat <- cor(test.features.norm)
+test.features.pca <- princomp(test.corr.mat)
+summary(test.features.pca) 
+test.prin.coms <- data.frame(as.matrix(test.features) %*% as.matrix(test.features.pca$loadings))
+
+# all principal components
+accuracy <- c()
+for(i in 1:100){
+  predicted <- knn(train = train.prin.coms, test = test.prin.coms, cl = train.rock, k = i)
+  ConMat <- table(test.rock, predicted)
+  TN <- ConMat[1,1]
+  FP <- ConMat[1,2]
+  FN <- ConMat[2,1]
+  TP <- ConMat[2,2]
+  accuracy[i] <- (TP + TN)/sum(ConMat)
+}
+plot(accuracy)
+which.max(accuracy) # optimal K = 70
+max(accuracy) # classification accuracy of 58.33%
+```
+
+```{r}
+# testing for acoustic coherence 
+
+rm(accuracy)
+early <- data[data$year<=median(data$year),] # 407 observations
+late <- data[data$year>median(data$year),] # 393 observations
+early.features <- early[,c(5,8:33)]
+early.rock <- early$rock
+late.features <- late[,c(5,8:33)]
+late.rock <- late$rock
+
+# logistic regression with all variables (early)
+
+cv.mod.early <- cv.glmnet(x = as.matrix(early.features), y = early.rock, family = "binomial", type.measure = "class")
+lambda <- cv.mod.early$lambda.min
+
+mod.early <- glmnet(early.features, early.rock, family = "binomial", lambda = lambda)
+mod.early.probs <- predict(mod.early, newx = as.matrix(early.features), type = "response")
+early$mod.early.probs <- mod.early.probs[,1]
+early.rock.class <- ifelse(early.rock == 1, "rock", "not rock")
+logistic.probs <- early$mod.early.probs
+mod.early.cp <- cutpointr(data.frame(early.rock.class, logistic.probs), x=logistic.probs, class = early.rock.class, method = maximize_metric, metric = accuracy)
+summary(mod.early.cp) # accuracy = 68.55%
+
+# logistic regression with all variables (late)
+
+cv.mod.late <- cv.glmnet(x = as.matrix(late.features), y = late.rock, family = "binomial", type.measure = "class")
+lambda <- cv.mod.late$lambda.min
+
+mod.late <- glmnet(late.features, late.rock, family = "binomial", lambda = lambda)
+mod.late.probs <- predict(mod.late, newx = as.matrix(late.features), type = "response")
+late$mod.late.probs <- mod.late.probs[,1]
+late.rock.class <- ifelse(late.rock == 1, "rock", "not rock")
+logistic.probs <- late$mod.late.probs
+mod.late.cp <- cutpointr(data.frame(late.rock.class, logistic.probs), x=logistic.probs, class = late.rock.class, method = maximize_metric, metric = accuracy)
+summary(mod.late.cp) # accuracy = 70.48%
+
+# logistic regression with principal components (early)
+
+early.features.norm <- scale(early.features)
+early.corr.mat <- cor(early.features.norm)
+early.features.pca <- princomp(early.corr.mat)
+summary(early.features.pca) 
+early.prin.coms <- data.frame(as.matrix(early.features) %*% as.matrix(early.features.pca$loadings))
+
+early.cv.mod.pca <- cv.glmnet(x = as.matrix(early.prin.coms), y = early.rock, family = "binomial", type.measure = "class")
+early.lambda.pca <- early.cv.mod.pca$lambda.min
+
+early.mod.pca <- glmnet(early.prin.coms, early.rock, family = "binomial", lambda = early.lambda.pca)
+early.mod.probs.pca <- predict(early.mod.pca, newx = as.matrix(early.prin.coms), type = "response")
+early$early.mod.probs.pca <- early.mod.probs.pca[,1]
+early.rock.class <- ifelse(early.rock == 1, "rock", "not rock")
+early.logistic.probs.pca <- early$early.mod.probs.pca
+early.mod.cp.pca <- cutpointr(data.frame(early.rock.class, early.logistic.probs.pca), x=early.logistic.probs.pca, class = early.rock.class, method = maximize_metric, metric = accuracy)
+summary(early.mod.cp.pca) # accuracy = 67.57%
+
+# logistic regression with principal components (late)
+
+late.features.norm <- scale(late.features)
+late.corr.mat <- cor(late.features.norm)
+late.features.pca <- princomp(late.corr.mat)
+summary(late.features.pca) 
+late.prin.coms <- data.frame(as.matrix(late.features) %*% as.matrix(late.features.pca$loadings))
+
+late.cv.mod.pca <- cv.glmnet(x = as.matrix(late.prin.coms), y = late.rock, family = "binomial", type.measure = "class")
+late.lambda.pca <- late.cv.mod.pca$lambda.min
+
+late.mod.pca <- glmnet(late.prin.coms, late.rock, family = "binomial", lambda = late.lambda.pca)
+late.mod.probs.pca <- predict(late.mod.pca, newx = as.matrix(late.prin.coms), type = "response")
+late$late.mod.probs.pca <- late.mod.probs.pca[,1]
+late.rock.class <- ifelse(late.rock == 1, "rock", "not rock")
+late.logistic.probs.pca <- late$late.mod.probs.pca
+late.mod.cp.pca <- cutpointr(data.frame(late.rock.class, late.logistic.probs.pca), x=late.logistic.probs.pca, class = late.rock.class, method = maximize_metric, metric = accuracy)
+summary(late.mod.cp.pca) #67.68
+
+# test for acoustic coherence (feature set)
+
+accoustic.coherence.probs <- predict(early.mod.pca, newx = as.matrix(late.features), type = "response")
+accoustic.coherence.cp <- cutpointr(data.frame(late.rock.class, accoustic.coherence.probs), x=accoustic.coherence.probs, class = late.rock.class, method = maximize_metric, metric = accuracy)
+summary(accoustic.coherence.cp) # accuracy = 55.98%
+
+# test for acoustic coherence (PCA)
+
+accoustic.coherence.probs.pca <- predict(early.mod.pca, newx = as.matrix(late.prin.coms), type = "response")
+accoustic.coherence.cp.pca <- cutpointr(data.frame(late.rock.class, accoustic.coherence.probs.pca), x=accoustic.coherence.probs.pca, class = late.rock.class, method = maximize_metric, metric = accuracy)
+summary(accoustic.coherence.cp.pca) # accuracy = 53.69%
+```
+

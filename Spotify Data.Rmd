@@ -42,9 +42,9 @@ add_artist_to_albums <- function(artist_id) {
 }
 
 album_and_songs <- function(artist_id) {
-    album_and_song <- cbind(add_artist_to_albums(artist_id)[1,], get_album(toString(add_artist_to_albums(artist_id)$album_id[1]))[[19]][[2]][,c("id", "name")], row.names=NULL)
+    album_and_song <- cbind(add_artist_to_albums(artist_id)[1,], get_album(toString(add_artist_to_albums(artist_id)$album_id[1]))[[18]][[2]][,c("id", "name")], row.names=NULL)
     for(i in 2:nrow(add_artist_to_albums(artist_id))) {
-        album_and_song <- rbind(album_and_song, cbind(add_artist_to_albums(artist_id)[i,], get_album(toString(add_artist_to_albums(artist_id)$album_id[i]))[[19]][[2]][,c("id", "name")], row.names=NULL))
+        album_and_song <- rbind(album_and_song, cbind(add_artist_to_albums(artist_id)[i,], get_album(toString(add_artist_to_albums(artist_id)$album_id[i]))[[18]][[2]][,c("id", "name")], row.names=NULL))
     }
     album_and_song <- album_and_song %>%
         dplyr::rename(song_name = name, song_id = id)
@@ -91,154 +91,43 @@ album_and_songs_genre <- function(genre) {
 
 data_and_audio_sample <- function(data, sample_size) {
     rows <- sample(nrow(data), sample_size)
-    tempo <- c()
-    loudness <- c()
+    tempo <- c(); loudness <- c(); p1 <- c(); p2 <- c(); p3 <- c(); p4 <- c(); p5 <- c(); p6 <- c(); p7 <- c(); p8 <- c(); p9 <- c(); p10 <- c(); p11 <- c(); p12 <- c(); t1 <- c(); t2 <- c(); t3 <- c(); t4 <- c(); t5 <- c(); t6 <- c(); t7 <- c(); t8 <- c(); t9 <- c(); t10 <- c(); t11 <- c(); t12 <- c()
     for (i in 1:sample_size) {
         sections <- get_track_audio_analysis(data[rows[i],]$song_id)$sections
         segments <- get_track_audio_analysis(data[rows[i],]$song_id)$segments
-        duration_percent <- (sections$tempo/sum(sections$tempo))
-        tempo[i] <- weighted.mean(sections$tempo, duration_percent)
-        loudness[i] <- weighted.mean(sections$loudness, duration_percent) 
+        pitches <- segments$pitches
+        timbre <- segments$timbre
+        pitch1 <- c(); pitch2 <- c(); pitch3 <- c(); pitch4 <- c(); pitch5 <- c(); pitch6 <- c(); pitch7 <- c(); pitch8 <- c(); pitch9 <- c(); pitch10 <- c(); pitch11 <- c(); pitch12 <- c(); timbre1 <- c(); timbre2 <- c(); timbre3 <- c(); timbre4 <- c(); timbre5 <- c(); timbre6 <- c(); timbre7 <- c(); timbre8 <- c(); timbre9 <- c(); timbre10 <- c(); timbre11 <- c(); timbre12 <- c();
+        for(j in 1:nrow(segments)){
+            pitch1[j] <- pitches[[j]][1]; pitch2[j] <- pitches[[j]][2]; pitch3[j] <- pitches[[j]][3]; pitch4[j] <- pitches[[j]][4]; pitch5[j] <- pitches[[j]][5]; pitch6[j] <- pitches[[j]][6]; pitch7[j] <- pitches[[j]][7]; pitch8[j] <- pitches[[j]][8]; pitch9[j] <- pitches[[j]][9]; pitch10[j] <- pitches[[j]][10]; pitch11[j] <- pitches[[j]][11]; pitch12[j] <- pitches[[j]][12]; timbre1[j] <- timbre[[j]][1]; timbre2[j] <- timbre[[j]][2]; timbre3[j] <- timbre[[j]][3]; timbre4[j] <- timbre[[j]][4]; timbre5[j] <- timbre[[j]][5]; timbre6[j] <- timbre[[j]][6]; timbre7[j] <- timbre[[j]][7]; timbre8[j] <- timbre[[j]][8]; timbre9[j] <- timbre[[j]][9]; timbre10[j] <- timbre[[j]][10]; timbre11[j] <- timbre[[j]][11]; timbre12[j] <- timbre[[j]][12] 
+}
+        p1[i] <- weighted.mean(pitch1, segments$duration); p2[i] <- weighted.mean(pitch2, segments$duration); p3[i] <- weighted.mean(pitch3, segments$duration); p4[i] <- weighted.mean(pitch4, segments$duration); p5[i] <- weighted.mean(pitch5, segments$duration); p6[i] <- weighted.mean(pitch6, segments$duration); p7[i] <- weighted.mean(pitch7, segments$duration); p8[i] <- weighted.mean(pitch8, segments$duration); p9[i] <- weighted.mean(pitch9, segments$duration); p10[i] <- weighted.mean(pitch10, segments$duration); p11[i] <- weighted.mean(pitch11, segments$duration); p12[i] <- weighted.mean(pitch12, segments$duration); t1[i] <- weighted.mean(timbre1, segments$duration); t2[i] <- weighted.mean(timbre2, segments$duration); t3[i] <- weighted.mean(timbre3, segments$duration); t4[i] <- weighted.mean(timbre4, segments$duration); t5[i] <- weighted.mean(timbre5, segments$duration); t6[i] <- weighted.mean(timbre6, segments$duration); t7[i] <- weighted.mean(timbre7, segments$duration); t8[i] <- weighted.mean(timbre8, segments$duration); t9[i] <- weighted.mean(timbre9, segments$duration); t10[i] <- weighted.mean(timbre10, segments$duration); t11[i] <- weighted.mean(timbre11, segments$duration); t12[i] <- weighted.mean(timbre12, segments$duration)
+        tempo[i] <- weighted.mean(sections$tempo, sections$duration)
+        loudness[i] <- weighted.mean(sections$loudness, sections$duration) 
     }
-    sampled_data <- data.frame(data[sample(nrow(data), sample_size), ], tempo, loudness)
+    genre <- rep(deparse(substitute(data)), sample_size)
+    sampled_data <- data.frame(data[sample(nrow(data), sample_size), ], tempo, loudness, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, genre)
     row.names(sampled_data) <- NULL
     return(sampled_data)
 }
-
-"
-make this a weighted average as well using the duration percent
-fir = 0
-for(i in 1:nrow(song1)) {
-    fir = fir + song1$timbre[[i]][1]
-}
-fir/nrow(song1)
-fir
-
-song2 <- get_track_audio_analysis(rock[1,]$song_id)$segments
-
-fir = 0
-for(i in 1:nrow(song2)) {
-    fir = fir + song2$timbre[[i]][1]
-}
-fir/nrow(song2)
-fir
-
-rock
-
-song1
-"
-
-#for the second part of the project, use this code in the above function to give loudness, tempo, and average timbre for each of the 12 tibral vectors 
 ```
 
 ```{r}
-set.seed(0)
-gospel <- read.csv("gospel.csv")
-rock <- read.csv("rock.csv")
-post_punk <- read.csv("post-punk.csv")
-polish <- read.csv("polish.csv")
-
-rock_sam <- data_and_audio_sample(rock, 100)
-for(i in 1:3) {
-    rock_sam <- rbind(rock_sam, data_and_audio_sample(rock, 100))
-}
-
-rock_sam$genre <- rep("rock", 400)
-
-gospel_sample <- data_and_audio_sample(gospel, 100)
-gospel_sample$genre <- rep("gospel", 100)
-rock_sample <- data_and_audio_sample(rock, 100)
-rock_sample$genre <- rep("rock", 100)
-post_punk_sample <- data_and_audio_sample(post_punk, 100)
-post_punk_sample$genre <- rep("post-punk", 100)
-polish_sample <- data_and_audio_sample(polish, 100)
-polish_sample$genre <- rep("polish", 100)
-small_data <- do.call(rbind, list(gospel_sample, rock_sample, post_punk_sample, polish_sample))
-small_data$genre <- as.factor(small_data$genre)
-small_data$rock <- ifelse(small_data$genre == "rock", 1, 0)
-
-small_data_mod <- glm(factor(rock)~loudness+year+tempo, data = small_data, family = "binomial")
-summary(small_data_mod)
-small_data$probs = predict(small_data_mod, newdata=small_data, type="response")
-
-plot(x = small_data$loudness, y = small_data$probs, col = factor(small_data$genre), main = "Predicted Probability of Rock Music by Song Loudness", xlab = "Loudness (dB)", ylab = "Precicted Probabilty of Rock")
-legend(-37, 0.75, legend=unique(small_data$genre),
-       col=factor(unique(small_data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-
-plot(x = small_data$tempo, y = small_data$probs, col = factor(small_data$genre), main = "Predicted Probability of Rock Music by Song Tempo", xlab = "Tempo (beats per minute)", ylab = "Precicted Probabilty of Rock")
-legend(60, 0.75, legend=unique(small_data$genre),
-       col=factor(unique(small_data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-
-plot(x = small_data$year, y = small_data$probs, col = factor(small_data$genre), main = "Predicted Probability of Rock Music by Release Year", xlab = "Year", ylab = "Precicted Probabilty of Rock")
-legend(2015, 0.75, legend=unique(small_data$genre),
-       col=factor(unique(small_data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-```
-
-```{r}
-bigger_data <- do.call(rbind, list(rock_sam, polish_sample, post_punk_sample, gospel_sample))
-bigger_data$rock <- ifelse(bigger_data$genre == "rock", 1, 0)
-bigger_data_mod <- glm(factor(rock)~loudness+year+tempo, data = bigger_data, family = "binomial")
-summary(bigger_data_mod)
-bigger_data$probs = predict(bigger_data_mod, newdata=bigger_data, type="response")
-
-plot(x = bigger_data$loudness, y = bigger_data$probs, col = factor(bigger_data$genre), main = "Predicted Probability of Rock Music by Song Loudness", xlab = "Loudness (dB)", ylab = "Precicted Probabilty of Rock")
-legend("topleft", legend=unique(bigger_data$genre),
-       col=factor(unique(bigger_data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-
-plot(x = bigger_data$tempo, y = bigger_data$probs, col = factor(bigger_data$genre), main = "Predicted Probability of Rock Music by Song Tempo", xlab = "Tempo (beats per minute)", ylab = "Precicted Probabilty of Rock")
-legend("topright", legend=unique(bigger_data$genre),
-       col=factor(unique(bigger_data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-
-plot(x = bigger_data$year, y = bigger_data$probs, col = factor(bigger_data$genre), main = "Predicted Probability of Rock Music by Release Year", xlab = "Year", ylab = "Precicted Probabilty of Rock")
-legend("topright", legend=unique(bigger_data$genre),
-       col=factor(unique(bigger_data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-
-bigger_data$log_odds <- log(bigger_data$probs/(1-bigger_data$probs))
-
-plot(x=bigger_data$loudness, y = bigger_data$log_odds)
-plot(x=bigger_data$tempo, y = bigger_data$log_odds)
-
-# minimize false negative rate
-library(cutpointr)
-library(ROCit)
-cp1 <- cutpointr(data.frame(factor(bigger_data$rock),bigger_data$probs), x=bigger_data$probs, class = factor(bigger_data$rock), method = minimize_metric, metric = )
-
-length(factor(bigger_data$rock))
-length(bigger_data$probs)
-
-summary(cp1)
-plot_metric(cp1)
-plot(cp1)
-
-probs <- bigger_data$probs
-rock_genre <- as.factor(bigger_data$rock)
-
-cp <- cutpointr(str(data.frame(probs, rock_genre)), probs, rock_genre, method = maximize_metric, metric = sum_sens_spec, na.rm = T)
-
-summary(cp)
-
-str(data.frame(probs, rock_genre))
-
-```
-
-```{r}
-post_punk
-# timed it out for some reason... 
-genres <- c("post-punk", "polish", "rap", "boy", "nerdcore", "dream", "crack", "columbus", "stl", "garage", "metal", "roots", "schlager", "italian", "military")
-
-post_punk <- album_and_songs_genre(genres[3])
-
-write.csv(post_punk, "~/Desktop/Denison/DA/DA 401/Project/rap.csv", row.names = F)
-
+genres <- c("rock", "polish", "post-punk", "gospel", "dream")
+album_and_songs("rock")
 for(genre in genres) {
     genre_music <- album_and_songs_genre(genre)
     write.csv(genre_music, paste("~/Desktop/Denison/DA/DA 401/Project/", genre, ".csv", sep = ""), row.names = F)
 }
+
+rock_sam <- data_and_audio_sample(rock, 400)
+polish_sam <- data_and_audio_sample(polish, 100)
+post_punk_sam <- data_and_audio_sample(post_punk, 100)
+gospel_sam <- data_and_audio_sample(gospel, 100)
+dream_sam <- data_and_audio_sample(dream, 100)
+
+big.data <- do.call(rbind, list(rock_sam, polish_sample, post_punk_sample, gospel_sample, dream_sample))
 ```
+
+
 
