@@ -1,7 +1,7 @@
 ---
 title: "Untitled"
 author: "Riley Coburn"
-date: "2023-04-04"
+date: "2023-04-05"
 output: html_document
 ---
 
@@ -15,16 +15,30 @@ library(car)
 library(glmnet)
 library(class)
 library(caret)
-library(GGally)
 ```
 
 ```{r}
-# read data
 setwd("~/Desktop/Denison/DA/DA 401/Project/Data")
 data <- read.csv("sample.csv")
-dim(na.omit(data)) # 800 values, 35 features
+data <- tail(data, 700)
+data <- rbind(head(data, 500), tail(data, 100))
 features <- data[,c(5,8:33)]
 rock <- data$rock
+
+cv.mod <- cv.glmnet(x = as.matrix(features), y = rock, family = "binomial", type.measure = "class")
+lambda <- cv.mod$lambda.min
+
+mod <- glmnet(features, rock, family = "binomial", lambda = lambda)
+mod.probs <- predict(mod, newx = as.matrix(features), type = "response")
+data$mod.probs <- mod.probs[,1]
+rock.class <- ifelse(data$rock == 1, "rock", "not rock")
+logistic.probs <- data$mod.probs
+mod.cp <- cutpointr(data.frame(rock.class, logistic.probs), x=logistic.probs, class = rock.class, method = maximize_metric, metric = accuracy)
+summary(mod.cp) # accuracy = 67.12%
+```
+# analysis minus post punk 
+
+```{r}
 
 set.seed(1)
 n = nrow(data)
@@ -83,17 +97,10 @@ mod.cp <- cutpointr(data.frame(rock.class, logistic.probs), x=logistic.probs, cl
 summary(mod.cp) # accuracy = 67.12%
 
 plot(x = data$year, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by Release Year", xlab = "Year", ylab = "Precicted Probabilty of Rock")
+abline(h = mod.cp$optimal_cutpoint, lty = 2, col = "orange", lwd = 3)
 legend("bottomleft", legend=unique(data$genre),
        col=factor(unique(data$genre)), pch=1, cex=0.8,
        title="Genres", text.font=4)
-
-plot(x = data$p8, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by 8th Pitch Class", xlab = "Pitch Class 8", ylab = "Precicted Probabilty of Rock")
-legend("bottomleft", legend=unique(data$genre),
-       col=factor(unique(data$genre)), pch=1, cex=0.8,
-       title="Genres", text.font=4)
-
-logit <- mod.probs/(1-mod.probs)
-ggpairs(cbind(features, logit))
 ```
 
 ```{r}
@@ -196,7 +203,7 @@ early$mod.early.probs <- mod.early.probs[,1]
 early.rock.class <- ifelse(early.rock == 1, "rock", "not rock")
 logistic.probs <- early$mod.early.probs
 mod.early.cp <- cutpointr(data.frame(early.rock.class, logistic.probs), x=logistic.probs, class = early.rock.class, method = maximize_metric, metric = accuracy)
-summary(mod.early.cp) # accuracy = 68.55%
+summary(mod.early.cp) # accuracy = 77.237%
 
 # logistic regression with all variables (late)
 
@@ -209,7 +216,7 @@ late$mod.late.probs <- mod.late.probs[,1]
 late.rock.class <- ifelse(late.rock == 1, "rock", "not rock")
 logistic.probs <- late$mod.late.probs
 mod.late.cp <- cutpointr(data.frame(late.rock.class, logistic.probs), x=logistic.probs, class = late.rock.class, method = maximize_metric, metric = accuracy)
-summary(mod.late.cp) # accuracy = 70.48%
+summary(mod.late.cp) # accuracy = 69.82%
 
 # logistic regression with principal components (early)
 
@@ -228,7 +235,7 @@ early$early.mod.probs.pca <- early.mod.probs.pca[,1]
 early.rock.class <- ifelse(early.rock == 1, "rock", "not rock")
 early.logistic.probs.pca <- early$early.mod.probs.pca
 early.mod.cp.pca <- cutpointr(data.frame(early.rock.class, early.logistic.probs.pca), x=early.logistic.probs.pca, class = early.rock.class, method = maximize_metric, metric = accuracy)
-summary(early.mod.cp.pca) # accuracy = 67.57%
+summary(early.mod.cp.pca) # accuracy = 77.23%
 
 # logistic regression with principal components (late)
 
@@ -247,18 +254,19 @@ late$late.mod.probs.pca <- late.mod.probs.pca[,1]
 late.rock.class <- ifelse(late.rock == 1, "rock", "not rock")
 late.logistic.probs.pca <- late$late.mod.probs.pca
 late.mod.cp.pca <- cutpointr(data.frame(late.rock.class, late.logistic.probs.pca), x=late.logistic.probs.pca, class = late.rock.class, method = maximize_metric, metric = accuracy)
-summary(late.mod.cp.pca) #67.68
+summary(late.mod.cp.pca) # accuracy = 72.73%
 
 # test for acoustic coherence (feature set)
 
-accoustic.coherence.probs <- predict(early.mod.pca, newx = as.matrix(late.features), type = "response")
+accoustic.coherence.probs <- predict(mod.early, newx = as.matrix(late.features), type = "response")
 accoustic.coherence.cp <- cutpointr(data.frame(late.rock.class, accoustic.coherence.probs), x=accoustic.coherence.probs, class = late.rock.class, method = maximize_metric, metric = accuracy)
-summary(accoustic.coherence.cp) # accuracy = 55.98%
+summary(accoustic.coherence.cp) # accuracy = 65.45%
 
 # test for acoustic coherence (PCA)
 
 accoustic.coherence.probs.pca <- predict(early.mod.pca, newx = as.matrix(late.prin.coms), type = "response")
 accoustic.coherence.cp.pca <- cutpointr(data.frame(late.rock.class, accoustic.coherence.probs.pca), x=accoustic.coherence.probs.pca, class = late.rock.class, method = maximize_metric, metric = accuracy)
-summary(accoustic.coherence.cp.pca) # accuracy = 53.69%
+summary(accoustic.coherence.cp.pca) # accuracy = 58.55%
 ```
+
 
