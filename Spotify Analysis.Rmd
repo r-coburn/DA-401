@@ -23,7 +23,7 @@ library(GGally)
 setwd("~/Desktop/Denison/DA/DA 401/Project/Data")
 data <- read.csv("sample.csv")
 dim(na.omit(data)) # 800 values, 35 features
-features <- data[,c(5,8:33)]
+features <- data[,c(5,8:21,23:33)]
 rock <- data$rock
 
 set.seed(1)
@@ -94,6 +94,10 @@ legend("bottomleft", legend=unique(data$genre),
 
 logit <- mod.probs/(1-mod.probs)
 ggpairs(cbind(features, logit))
+plot(glm(rock~., data = data.frame(features, rock), family = "binomial")
+, which = 4, id.n = 5)
+car::vif(glm(rock~., data = data.frame(features, rock), family = "binomial")
+)
 ```
 
 ```{r}
@@ -123,6 +127,13 @@ plot(x = prin.coms$Comp.1, y = prin.coms$Comp.2, col = factor(data$genre), main 
 legend("bottomleft", legend=unique(data$genre),
        col=factor(unique(data$genre)), pch=1, cex=0.8,
        title="Genres", text.font=4)
+
+logit <- mod.probs.pca/(1-mod.probs.pca)
+ggpairs(cbind(prin.coms, logit))
+plot(glm(rock~., data = data.frame(prin.coms, rock), family = "binomial")
+, which = 4, id.n = 5)
+car::vif(glm(rock~., data = data.frame(prin.coms, rock), family = "binomial")
+)
 ```
 
 ```{r}
