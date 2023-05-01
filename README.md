@@ -8,6 +8,6 @@ The figures folder contains all of the figures in the paper.
 
 The Spotify R markdown file is the file in which the data was pulled, compiled, and sampled. This makes use of the Spotify API, under proper, fair use of it. 
 
-The Spotify Analysis R markdown contains all of the methods that I implemented. This begins with the random teams modeling, followed by logistic regression, PCA, and KNN. Included as well is the acoustic coherence testing. 
+The Spotify Analysis R markdown files contain all of the methods that I implemented. This begins with the random teams modeling, followed by logistic regression, PCA, and KNN. Included as well is the acoustic coherence testing. The analyses conducted include the analysis using rock and using jazz.
 
 The final file is the Spotify Analysis (no post punk) R markdown. This file is identical to the previous Spotify Analysis R markdown, however, this time post-punk has been removed as a genre in order to better test for genre coherence and granularity. 

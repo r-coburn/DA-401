@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Rock Analysis"
 author: "Riley Coburn"
 date: "2023-04-04"
 output: html_document
@@ -23,6 +23,7 @@ library(GGally)
 setwd("~/Desktop/Denison/DA/DA 401/Project/Data")
 data <- read.csv("sample.csv")
 dim(na.omit(data)) # 800 values, 35 features
+data <- rbind(data[c(1:300,701:800),], data[301:700,])
 features <- data[,c(5,8:21,23:33)]
 rock <- data$rock
 
@@ -41,31 +42,42 @@ test.rock <- as.factor(test$rock)
 ```
 
 ```{r, warning = F}
-# gut check
+# gut check 
 
 set.seed(1)
-balanced.data.random <- rbind(head(data, 400), tail(data, 100))
+balanced.data.random <- rbind(head(data, 400), tail(data, 400)[sample(1:400,100),])
 table((balanced.data.random$genre))
 random.features <- balanced.data.random[,c(5,8:33)]
-
 random.model.accuracy <- c()
+
 for(i in 1:50) {
-  data.random <- random.features[sample(nrow(random.features)),]
-  team <- c(rep(0,250),rep(1,250))
+  n.random = nrow(random.features)
+  index <- sample(1:n.random, size = n.random*0.7)
+  random.training <- random.features[index, ]
+  random.testing <- random.features[-index, ]
+
+  data.random <- random.training[sample(nrow(random.training)),]
+  team <- c(rep(0,175),rep(1,175))
   
   cv.mod.random <- cv.glmnet(x = as.matrix(data.random), y = team, family = "binomial", type.measure = "class")
   lambda <- cv.mod.random$lambda.min
 
   mod <- glmnet(as.matrix(data.random), team, family = "binomial", lambda = lambda)
   
-  random.probs <- predict(mod, newx = as.matrix(data.random), type = "response")
-  team.class <- ifelse(team == 1, "team 1", "team 2")
+  testing.random <- random.testing[sample(nrow(random.testing)),]
+  test.team <- c(rep(0, 75), rep(1, 75))
+  
+  mod <- glmnet(as.matrix(testing.random), test.team, family = "binomial", lambda = lambda)
+  
+  random.probs <- predict(mod, newx = as.matrix(random.testing), type = "response")
+  team.class <- ifelse(test.team == 1, "team 1", "team 2")
   mod.cp <- cutpointr(data.frame(team.class, random.probs), x=random.probs, class = team.class, method = maximize_metric, metric = accuracy)
 
   random.model.accuracy[i] <- mod.cp$acc
 }
 
-hist(random.model.accuracy); mean(random.model.accuracy) # accuracy = 58.92%
+hist(random.model.accuracy, main = "Random Model Accuracy", xlab = "Random Model Accuracy")
+mean(random.model.accuracy) # accuracy = 57.03%
 ```
 
 ```{r}
@@ -82,13 +94,13 @@ logistic.probs <- data$mod.probs
 mod.cp <- cutpointr(data.frame(rock.class, logistic.probs), x=logistic.probs, class = rock.class, method = maximize_metric, metric = accuracy)
 summary(mod.cp) # accuracy = 67.12%
 
-plot(x = data$year, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by Release Year", xlab = "Year", ylab = "Precicted Probabilty of Rock")
+plot(x = data$year, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by Release Year", xlab = "Year", ylab = "Predicted Probabilty of Rock")
 legend("bottomleft", legend=unique(data$genre),
        col=factor(unique(data$genre)), pch=1, cex=0.8,
        title="Genres", text.font=4)
 
-plot(x = data$p8, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by 8th Pitch Class", xlab = "Pitch Class 8", ylab = "Precicted Probabilty of Rock")
-legend("bottomleft", legend=unique(data$genre),
+plot(x = data$p8, y = data$mod.probs, col = factor(data$genre), main = "Predicted Probability of Rock Music by 8th Pitch Class", xlab = "Pitch Class 8", ylab = "Predicted Probabilty of Rock")
+legend("bottomright", legend=unique(data$genre),
        col=factor(unique(data$genre)), pch=1, cex=0.8,
        title="Genres", text.font=4)
 

@@ -1,5 +1,5 @@
 ---
-title: "EDA"
+title: "Spotify Data"
 author: "Riley Coburn"
 date: "2023-02-22"
 output: html_document
@@ -10,12 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, warning = F}
-#always run
-
 library(spotifyr)
-library(lubridate)
-library(tidyverse)
-library(knitr)
+library(dplyr)
 
 Sys.setenv(SPOTIFY_CLIENT_ID = '4368c76bfce14f35b6ea1b3ea6b3723b')
 Sys.setenv(SPOTIFY_CLIENT_SECRET = '533222a8cd3b4d8398d83e9c87ec084f')
@@ -113,20 +109,22 @@ data_and_audio_sample <- function(data, sample_size) {
 ```
 
 ```{r}
-genres <- c("rock", "polish", "post-punk", "gospel", "dream")
-album_and_songs("rock")
+genres <- c("rock", "polish", "post-punk", "gospel", "dream", "jazz")
 for(genre in genres) {
     genre_music <- album_and_songs_genre(genre)
-    write.csv(genre_music, paste("~/Desktop/Denison/DA/DA 401/Project/", genre, ".csv", sep = ""), row.names = F)
+    write.csv(genre_music, paste("~/Desktop/Denison/DA/DA 401/Project/Data/", genre, ".csv", sep = ""), row.names = F)
 }
 
+jazz_sam <- data_and_audio_sample(jazz, 400)
 rock_sam <- data_and_audio_sample(rock, 400)
 polish_sam <- data_and_audio_sample(polish, 100)
 post_punk_sam <- data_and_audio_sample(post_punk, 100)
 gospel_sam <- data_and_audio_sample(gospel, 100)
 dream_sam <- data_and_audio_sample(dream, 100)
 
-big.data <- do.call(rbind, list(rock_sam, polish_sample, post_punk_sample, gospel_sample, dream_sample))
+big.data <- do.call(rbind, list(rock_sam, polish_sam, post_punk_sam, gospel_sam, dream_sam, jazz_sam))
+
+write.csv(big.data, "~/Desktop/Denison/DA/DA 401/Project/Data/sample.csv")
 ```
 
 
